@@ -5,6 +5,10 @@ from functools import lru_cache
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
+    # Environment
+    environment: str = "development"  # development, production
+    log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    
     # Database
     database_url: str = "postgresql://newsfeed:newsfeed_secret@localhost:5432/newsfeed"
     

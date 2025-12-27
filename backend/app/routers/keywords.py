@@ -6,8 +6,10 @@ from app.database import get_db
 from app.models.keyword import UserKeyword
 from app.schemas.keyword import KeywordCreate, KeywordResponse, KeywordList, DeleteResponse
 from app.services.auth_service import get_current_user
+from app.logging_config import get_logger
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 @router.get("", response_model=KeywordList)
@@ -24,6 +26,8 @@ async def get_keywords(
         .order_by(UserKeyword.created_at.desc())
         .all()
     )
+    
+    logger.debug(f"Retrieved {len(keywords)} keywords for user {user_id}")
     
     return KeywordList(
         keywords=[KeywordResponse.model_validate(kw) for kw in keywords],
@@ -52,8 +56,10 @@ async def create_keyword(
         db.add(keyword)
         db.commit()
         db.refresh(keyword)
+        logger.info(f"Keyword created | user={user_id} | keyword={normalized_keyword}")
     except IntegrityError:
         db.rollback()
+        logger.warning(f"Duplicate keyword attempt | user={user_id} | keyword={normalized_keyword}")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Keyword '{normalized_keyword}' already exists",
@@ -84,6 +90,7 @@ async def delete_keyword(
     )
     
     if not db_keyword:
+        logger.warning(f"Keyword not found for deletion | user={user_id} | keyword={normalized_keyword}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Keyword '{keyword}' not found",
@@ -92,5 +99,6 @@ async def delete_keyword(
     db.delete(db_keyword)
     db.commit()
     
+    logger.info(f"Keyword deleted | user={user_id} | keyword={normalized_keyword}")
+    
     return DeleteResponse(message=f"Keyword '{keyword}' deleted successfully")
-

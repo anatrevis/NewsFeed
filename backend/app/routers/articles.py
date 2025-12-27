@@ -6,8 +6,10 @@ from app.models.keyword import UserKeyword
 from app.schemas.article import ArticleList, SortBy, Language, MatchMode
 from app.services.auth_service import get_current_user
 from app.services.news_service import NewsService
+from app.logging_config import get_logger
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 @router.get("", response_model=ArticleList)
@@ -40,10 +42,16 @@ async def get_articles(
     keywords = [kw.keyword for kw in user_keywords]
     
     if not keywords:
+        logger.debug(f"No keywords found for user {user_id}, returning empty list")
         return ArticleList(articles=[], totalResults=0)
     
     # Fetch articles from News API
     news_service = NewsService()
+    
+    logger.debug(
+        f"Fetching articles | user={user_id} | keywords={keywords} | "
+        f"page={page} | sort={sort_by.value} | lang={language.value} | mode={match_mode.value}"
+    )
     
     try:
         articles = await news_service.fetch_articles(
@@ -54,8 +62,16 @@ async def get_articles(
             language=language.value,
             match_mode=match_mode.value,
         )
+        
+        logger.info(
+            f"Articles fetched | user={user_id} | count={len(articles.articles)} | "
+            f"total={articles.totalResults}"
+        )
+        
         return articles
     except ValueError as e:
+        logger.error(f"Configuration error fetching articles | user={user_id} | error={str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
+        logger.error(f"Failed to fetch articles | user={user_id} | error={str(e)}", exc_info=True)
         raise HTTPException(status_code=502, detail=f"Failed to fetch articles: {str(e)}")

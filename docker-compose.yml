@@ -107,10 +107,17 @@ services:
       dockerfile: Dockerfile
     container_name: newsfeed-backend
     environment:
+      # Application
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Database
       DATABASE_URL: postgresql://${POSTGRES_USER:-newsfeed}:${POSTGRES_PASSWORD:-newsfeed_secret}@postgres:5432/${POSTGRES_DB:-newsfeed}
+      # External APIs
       NEWS_API_KEY: ${NEWS_API_KEY}
+      # Authentication
       AUTHENTIK_URL: http://authentik-server:9000
       AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID:-newsfeed-app}
+      # CORS
       CORS_ORIGINS: http://localhost:3000
     ports:
       - "8000:8000"

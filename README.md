@@ -4,11 +4,13 @@ A full-stack news aggregator where authenticated users save keyword preferences 
 
 ## Features
 
-- **User Authentication**: OAuth2/OIDC via Authentik with PKCE flow
+- **User Authentication**: Custom login/signup UI with Authentik backend
 - **Keyword Management**: Save and delete personal keyword preferences
-- **Personalized Feed**: View articles filtered by your keywords
+- **Personalized Feed**: View articles filtered by your keywords with OR/AND matching
+- **Article Sorting & Filtering**: Sort by date/relevancy, filter by 13 languages
 - **Article Details**: Click into articles for more detail with links to full articles
 - **Responsive UI**: Modern React interface with Tailwind CSS
+- **Structured Logging**: Configurable log levels with dev/production formats
 
 ## Tech Stack
 
@@ -84,24 +86,29 @@ That's it! Wait ~2-3 minutes for first-time initialization, then access:
 - **API Docs**: http://localhost:8000/docs  
 - **Authentik Admin**: http://localhost:9000
 
-### Authentication (Auto-Configured!)
+### Authentication
 
-The OAuth2 application and provider are **automatically configured** via Authentik Blueprints on first startup. No manual setup required!
+The application uses a **custom login/signup UI** with Authentik as the authentication backend. Users can self-register without needing admin access!
 
-**Default Admin Credentials**: `akadmin` / `admin123`
+**Self-Registration:**
+1. Go to: http://localhost:3000
+2. Click "Sign up" on the login page
+3. Create an account with username (lowercase letters/numbers only), email, and password
+4. Login with your new credentials
 
-**To create a test user:**
-1. Go to: http://localhost:9000
-2. Login with admin credentials above
-3. Go to: Admin → Directory → Users → Create
-4. Fill in username, email, and password
-5. This user can now log in to the NewsFeed app at http://localhost:3000
+**Username Requirements:**
+- 3-50 characters
+- Lowercase letters and numbers only (no spaces, uppercase, or special characters)
 
-**What's auto-configured:**
+**Admin Access** (for managing users):
+- Authentik Admin: http://localhost:9000
+- Default credentials: `akadmin` / `admin123`
+
+**What's auto-configured via Blueprints:**
 - ✅ OAuth2 Provider (`NewsFeed Provider`)
 - ✅ Application (`NewsFeed` with slug `newsfeed-app`)
+- ✅ Enrollment flow for self-registration
 - ✅ Client ID: `newsfeed-app` (public client)
-- ✅ Redirect URIs: `http://localhost:3000/callback`
 - ✅ OpenID scopes: `openid`, `email`, `profile`
 
 ## How Keyword Filtering Works
@@ -117,6 +124,35 @@ The OAuth2 application and provider are **automatically configured** via Authent
    - Returns matching articles from the last 30 days
 
 4. **Results**: Users see articles from various sources matching their interests
+
+5. **Match Mode**: Users can toggle between:
+   - **Any Keyword (OR)**: Articles matching any of your keywords (broader results)
+   - **All Keywords (AND)**: Articles containing all keywords (stricter, more relevant)
+
+## Logging
+
+The backend features structured logging with different formats for development and production:
+
+### Development Mode (default)
+Human-readable colored output:
+```
+2025-12-27 17:02:48 | INFO    | newsfeed.app.main | main.py:24 | NewsFeed API starting...
+```
+
+### Production Mode
+JSON format for log aggregators (ELK, CloudWatch, etc.):
+```json
+{"timestamp": "2025-12-27T17:02:48Z", "level": "INFO", "logger": "newsfeed.app.main", "message": "..."}
+```
+
+### Configuration
+Set in your `.env` file:
+```bash
+ENVIRONMENT=development  # or production
+LOG_LEVEL=INFO          # DEBUG, INFO, WARNING, ERROR, CRITICAL
+```
+
+Use `DEBUG` for verbose output during development, `WARNING` or `ERROR` for production.
 
 ## API Endpoints
 
@@ -168,16 +204,19 @@ npm test -- --run  # Single run
 
 | Area | Framework | Tests | Coverage |
 |------|-----------|-------|----------|
-| **Backend** | Pytest | 37 | Keywords CRUD, Articles API, Auth, News Service |
-| **Frontend** | Vitest | 23 | App routing, Auth context, KeywordManager component |
+| **Backend** | Pytest | 69 | Keywords, Articles, Auth, News Service |
+| **Frontend** | Vitest | 19 | App routing, Auth context, KeywordManager |
 
 **Backend tests include:**
 - Keyword creation, retrieval, deletion
 - Input validation (empty keywords, duplicates, length limits)
 - User isolation (keywords are per-user)
 - Article fetching with pagination and sorting
-- Sort parameter enum validation (`relevancy`, `popularity`, `publishedAt`)
-- Authentication requirements on protected routes
+- Match mode (OR/AND keyword logic)
+- Username validation (lowercase, alphanumeric only)
+- Password and email validation
+- JWT token validation
+- Authentication endpoints (login, signup, logout)
 - News API service mocking (responses, errors, timeouts)
 
 **Frontend tests include:**
@@ -207,6 +246,7 @@ newsfeed/
 │       ├── main.py            # FastAPI entry point
 │       ├── config.py          # Environment settings
 │       ├── database.py        # PostgreSQL connection
+│       ├── logging_config.py  # Structured logging setup
 │       ├── models/            # SQLAlchemy models
 │       ├── schemas/           # Pydantic models
 │       ├── routers/           # API endpoints
@@ -227,14 +267,16 @@ newsfeed/
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NEWS_API_KEY` | News API key for fetching articles | Yes |
-| `POSTGRES_USER` | PostgreSQL username (default: `newsfeed`) | No |
-| `POSTGRES_PASSWORD` | PostgreSQL password | No |
-| `POSTGRES_DB` | PostgreSQL database name (default: `newsfeed`) | No |
-| `AUTHENTIK_SECRET_KEY` | Authentik secret key | No |
-| `AUTHENTIK_CLIENT_ID` | OAuth client ID (default: `newsfeed-app`) | No |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEWS_API_KEY` | News API key for fetching articles | **Required** |
+| `ENVIRONMENT` | `development` or `production` | `development` |
+| `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` | `INFO` |
+| `POSTGRES_USER` | PostgreSQL username | `newsfeed` |
+| `POSTGRES_PASSWORD` | PostgreSQL password | `newsfeed_secret` |
+| `POSTGRES_DB` | PostgreSQL database name | `newsfeed` |
+| `AUTHENTIK_SECRET_KEY` | Authentik secret key | Auto-generated |
+| `AUTHENTIK_CLIENT_ID` | OAuth client ID | `newsfeed-app` |
 
 ## News API Limitations
 
@@ -244,11 +286,12 @@ newsfeed/
 
 ## Assumptions & Limitations
 
-1. **Authentication**: Requires Authentik setup - users must be created in Authentik admin
-2. **News API**: Free tier has rate limits; articles older than 30 days not available
+1. **Authentication**: Requires Authentik to be running; users can self-register via the signup page
+2. **News API**: Free tier has rate limits (100 req/day); articles older than 30 days not available
 3. **Keyword Matching**: Uses News API's built-in search, which may not be exact matches
 4. **Article Storage**: Articles are not stored locally; each refresh fetches from News API
 5. **Single User Session**: Designed for single browser session per user
+6. **Username Format**: Only lowercase letters and numbers allowed (no special characters)
 
 ## Development
 

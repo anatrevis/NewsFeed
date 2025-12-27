@@ -4,8 +4,10 @@ from typing import Optional
 
 from app.config import get_settings
 from app.schemas.article import Article, ArticleList, ArticleSource
+from app.logging_config import get_logger
 
 settings = get_settings()
+logger = get_logger(__name__)
 
 
 class NewsService:
@@ -39,9 +41,11 @@ class NewsService:
             ArticleList with articles and total count
         """
         if not keywords:
+            logger.debug("No keywords provided, returning empty list")
             return ArticleList(articles=[], totalResults=0)
         
         if not self.api_key:
+            logger.error("NEWS_API_KEY is not configured")
             raise ValueError("NEWS_API_KEY is not configured")
         
         # Build query based on match mode
@@ -65,6 +69,11 @@ class NewsService:
             "language": language,
         }
         
+        logger.debug(
+            f"News API request | query={query} | sort={sort_by} | "
+            f"lang={language} | page={page} | mode={match_mode}"
+        )
+        
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
@@ -75,17 +84,21 @@ class NewsService:
                 
                 if response.status_code != 200:
                     error_data = response.json()
-                    raise Exception(f"News API error: {error_data.get('message', 'Unknown error')}")
+                    error_msg = error_data.get('message', 'Unknown error')
+                    logger.error(f"News API error | status={response.status_code} | error={error_msg}")
+                    raise Exception(f"News API error: {error_msg}")
                 
                 data = response.json()
                 
                 # Filter out articles with missing required fields (title, url)
                 articles = []
+                skipped = 0
                 for art in data.get("articles", []):
                     title = art.get("title")
                     url = art.get("url")
                     # Skip articles without title or url
                     if not title or not url:
+                        skipped += 1
                         continue
                     articles.append(Article(
                         source=ArticleSource(
@@ -101,15 +114,27 @@ class NewsService:
                         content=art.get("content"),
                     ))
                 
+                total_results = data.get("totalResults", 0)
+                
+                if skipped > 0:
+                    logger.debug(f"Skipped {skipped} articles with missing title/url")
+                
+                logger.info(
+                    f"News API response | articles={len(articles)} | "
+                    f"total={total_results} | query={query[:50]}..."
+                )
+                
                 return ArticleList(
                     articles=articles,
-                    totalResults=data.get("totalResults", 0),
+                    totalResults=total_results,
                     status=data.get("status", "ok"),
                 )
                 
         except httpx.TimeoutException:
+            logger.error(f"News API timeout | query={query[:50]}...")
             raise Exception("News API request timed out")
         except httpx.RequestError as e:
+            logger.error(f"News API connection error | error={str(e)}")
             raise Exception(f"Failed to connect to News API: {str(e)}")
 
     async def get_article_by_url(self, url: str) -> Optional[Article]:
