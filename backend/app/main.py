@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import keywords, articles
+from app.routers import keywords, articles, auth
 
 settings = get_settings()
 
@@ -22,6 +22,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(keywords.router, prefix="/api/keywords", tags=["Keywords"])
 app.include_router(articles.router, prefix="/api/articles", tags=["Articles"])
 

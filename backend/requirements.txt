@@ -10,12 +10,14 @@ psycopg2-binary==2.9.9
 # Validation
 pydantic==2.6.1
 pydantic-settings==2.1.0
+email-validator==2.1.0
 
 # HTTP client for News API and Authentik
 httpx==0.26.0
 
 # Authentication (JWT validation)
 python-jose[cryptography]==3.3.0
+PyJWT==2.8.0
 
 # Utilities
 python-dotenv==1.0.1

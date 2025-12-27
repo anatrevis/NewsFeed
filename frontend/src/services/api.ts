@@ -5,6 +5,75 @@ function getAuthHeader(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+// Auth types
+export interface UserInfo {
+  sub: string
+  email?: string
+  name?: string
+  preferred_username?: string
+}
+
+export interface AuthResponse {
+  access_token: string
+  token_type: string
+  user: UserInfo
+}
+
+export interface SignupResponse {
+  message: string
+  username: string
+}
+
+// Auth API
+export async function loginUser(username: string, password: string): Promise<AuthResponse> {
+  const response = await fetch(`${API_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ username, password }),
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Login failed' }))
+    throw new Error(error.detail || 'Invalid username or password')
+  }
+  
+  return response.json()
+}
+
+export async function signupUser(
+  username: string,
+  email: string,
+  password: string
+): Promise<SignupResponse> {
+  const response = await fetch(`${API_URL}/api/auth/signup`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ username, email, password }),
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Signup failed' }))
+    throw new Error(error.detail || 'Failed to create account')
+  }
+  
+  return response.json()
+}
+
+export async function logoutUser(): Promise<void> {
+  const token = localStorage.getItem('newsfeed_token')
+  
+  await fetch(`${API_URL}/api/auth/logout`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  }).catch(() => {
+    // Ignore logout errors - we still want to clear local state
+  })
+}
+
 // Keyword types
 export interface Keyword {
   id: string

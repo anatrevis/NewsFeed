@@ -10,10 +10,37 @@ metadata:
 
 entries:
   # ===================
+  # EMAIL UNIQUENESS POLICY
+  # ===================
+  
+  # Policy to check email uniqueness
+  - model: authentik_policies_expression.expressionpolicy
+    id: email-uniqueness-policy
+    identifiers:
+      name: newsfeed-email-uniqueness
+    attrs:
+      name: newsfeed-email-uniqueness
+      expression: |
+        from authentik.core.models import User
+        
+        # Get the email from the prompt data
+        email = request.context.get('prompt_data', {}).get('email', '')
+        
+        if not email:
+            return True  # No email provided, let other validation handle it
+        
+        # Check if a user with this email already exists
+        if User.objects.filter(email__iexact=email).exists():
+            ak_message("Email is already registered")
+            return False
+        
+        return True
+
+  # ===================
   # ENROLLMENT FLOW (User Registration)
   # ===================
   
-  # Create enrollment flow
+  # Create enrollment flow - publicly accessible
   - model: authentik_flows.flow
     id: enrollment-flow
     identifiers:
@@ -23,7 +50,7 @@ entries:
       slug: newsfeed-enrollment
       title: Create Account
       designation: enrollment
-      authentication: require_unauthenticated
+      authentication: none  # No authentication required to access this flow
 
   # Stage 1: Prompt for user details
   - model: authentik_stages_prompt.promptstage
@@ -37,6 +64,8 @@ entries:
         - !Find [authentik_stages_prompt.prompt, [field_key, email]]
         - !Find [authentik_stages_prompt.prompt, [field_key, password]]
         - !Find [authentik_stages_prompt.prompt, [field_key, password_repeat]]
+      validation_policies:
+        - !KeyOf email-uniqueness-policy
 
   # Stage 2: Create the user
   - model: authentik_stages_user_write.userwritestage
@@ -48,7 +77,7 @@ entries:
       create_users_as_inactive: false
       user_creation_mode: always_create
 
-  # Stage 3: Log the user in
+  # Stage 3: Log the user in (optional - skip for API-based signup)
   - model: authentik_stages_user_login.userloginstage
     id: enrollment-user-login
     identifiers:
@@ -144,4 +173,3 @@ entries:
       meta_launch_url: http://localhost:3000
       meta_description: News Feed Application - View articles based on your keyword preferences
       policy_engine_mode: any
-

@@ -1,3 +1,4 @@
+import jwt
 import httpx
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -9,20 +10,41 @@ security = HTTPBearer(auto_error=False)
 
 
 class AuthService:
-    """Service for Authentik token validation."""
+    """Service for token validation."""
 
     def __init__(self):
         self.authentik_url = settings.authentik_url
+        self.jwt_secret = settings.authentik_client_id  # Same secret used in auth router
 
-    async def validate_oauth_token(self, token: str) -> dict | None:
+    def validate_app_jwt(self, token: str) -> dict | None:
         """
-        Validate OAuth token (JWT) with Authentik's userinfo endpoint.
+        Validate our application's JWT tokens.
+        """
+        try:
+            payload = jwt.decode(
+                token,
+                self.jwt_secret,
+                algorithms=["HS256"],
+            )
+            return {
+                "sub": payload.get("sub", ""),
+                "email": payload.get("email", ""),
+                "name": payload.get("name", ""),
+                "preferred_username": payload.get("preferred_username", ""),
+            }
+        except jwt.ExpiredSignatureError:
+            return None
+        except jwt.InvalidTokenError:
+            return None
+
+    async def validate_authentik_token(self, token: str) -> dict | None:
+        """
+        Validate token with Authentik's userinfo endpoint (fallback).
         """
         try:
             async with httpx.AsyncClient() as client:
-                url = f"{self.authentik_url}/application/o/userinfo/"
                 response = await client.get(
-                    url,
+                    f"{self.authentik_url}/application/o/userinfo/",
                     headers={"Authorization": f"Bearer {token}"},
                     timeout=10.0,
                 )
@@ -32,38 +54,17 @@ class AuthService:
         except Exception:
             return None
 
-    async def validate_api_token(self, token: str) -> dict | None:
-        """
-        Validate Authentik API token.
-        """
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{self.authentik_url}/api/v3/core/users/me/",
-                    headers={"Authorization": f"Bearer {token}"},
-                    timeout=10.0,
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    user_data = data.get("user", data)
-                    return {
-                        "sub": str(user_data.get("pk", "")),
-                        "email": user_data.get("email", ""),
-                        "name": user_data.get("name", ""),
-                        "preferred_username": user_data.get("username", ""),
-                    }
-                return None
-        except Exception:
-            return None
-
     async def validate_token(self, token: str) -> dict | None:
         """
-        Validate any token type (OAuth JWT or API token).
-        JWT tokens start with "eyJ" (base64 for {"alg":...)
+        Validate token - first try our app JWT, then Authentik.
         """
-        if token.startswith("eyJ"):
-            return await self.validate_oauth_token(token)
-        return await self.validate_api_token(token)
+        # First, try to validate as our app's JWT
+        user_info = self.validate_app_jwt(token)
+        if user_info:
+            return user_info
+        
+        # Fallback to Authentik validation
+        return await self.validate_authentik_token(token)
 
 
 async def get_current_user(
@@ -90,4 +91,3 @@ async def get_current_user(
         )
     
     return user_info
-
