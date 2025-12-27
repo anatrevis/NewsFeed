@@ -1,0 +1,147 @@
+# Authentik Blueprint for NewsFeed Application
+# This blueprint auto-configures OAuth2 provider and application on startup
+# Includes self-registration (enrollment) flow for new users
+
+version: 1
+metadata:
+  name: NewsFeed Application Setup
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+
+entries:
+  # ===================
+  # ENROLLMENT FLOW (User Registration)
+  # ===================
+  
+  # Create enrollment flow
+  - model: authentik_flows.flow
+    id: enrollment-flow
+    identifiers:
+      slug: newsfeed-enrollment
+    attrs:
+      name: NewsFeed User Registration
+      slug: newsfeed-enrollment
+      title: Create Account
+      designation: enrollment
+      authentication: require_unauthenticated
+
+  # Stage 1: Prompt for user details
+  - model: authentik_stages_prompt.promptstage
+    id: enrollment-prompt-stage
+    identifiers:
+      name: newsfeed-enrollment-prompt
+    attrs:
+      name: newsfeed-enrollment-prompt
+      fields:
+        - !Find [authentik_stages_prompt.prompt, [field_key, username]]
+        - !Find [authentik_stages_prompt.prompt, [field_key, email]]
+        - !Find [authentik_stages_prompt.prompt, [field_key, password]]
+        - !Find [authentik_stages_prompt.prompt, [field_key, password_repeat]]
+
+  # Stage 2: Create the user
+  - model: authentik_stages_user_write.userwritestage
+    id: enrollment-user-write
+    identifiers:
+      name: newsfeed-enrollment-write
+    attrs:
+      name: newsfeed-enrollment-write
+      create_users_as_inactive: false
+      user_creation_mode: always_create
+
+  # Stage 3: Log the user in
+  - model: authentik_stages_user_login.userloginstage
+    id: enrollment-user-login
+    identifiers:
+      name: newsfeed-enrollment-login
+    attrs:
+      name: newsfeed-enrollment-login
+      session_duration: seconds=0
+
+  # Bind stages to enrollment flow
+  - model: authentik_flows.flowstagebinding
+    id: enrollment-binding-1
+    identifiers:
+      target: !KeyOf enrollment-flow
+      stage: !KeyOf enrollment-prompt-stage
+    attrs:
+      target: !KeyOf enrollment-flow
+      stage: !KeyOf enrollment-prompt-stage
+      order: 10
+
+  - model: authentik_flows.flowstagebinding
+    id: enrollment-binding-2
+    identifiers:
+      target: !KeyOf enrollment-flow
+      stage: !KeyOf enrollment-user-write
+    attrs:
+      target: !KeyOf enrollment-flow
+      stage: !KeyOf enrollment-user-write
+      order: 20
+
+  - model: authentik_flows.flowstagebinding
+    id: enrollment-binding-3
+    identifiers:
+      target: !KeyOf enrollment-flow
+      stage: !KeyOf enrollment-user-login
+    attrs:
+      target: !KeyOf enrollment-flow
+      stage: !KeyOf enrollment-user-login
+      order: 30
+
+  # ===================
+  # LINK ENROLLMENT TO LOGIN PAGE
+  # ===================
+  
+  # Update the default identification stage to show "Register" link
+  - model: authentik_stages_identification.identificationstage
+    id: identification-stage-update
+    identifiers:
+      name: default-authentication-identification
+    attrs:
+      name: default-authentication-identification
+      enrollment_flow: !KeyOf enrollment-flow
+      user_fields:
+        - email
+        - username
+
+  # ===================
+  # OAUTH2 PROVIDER
+  # ===================
+  
+  - model: authentik_providers_oauth2.oauth2provider
+    id: newsfeed-provider
+    identifiers:
+      name: NewsFeed Provider
+    attrs:
+      name: NewsFeed Provider
+      authentication_flow: !Find [authentik_flows.flow, [slug, default-authentication-flow]]
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      client_type: public
+      client_id: newsfeed-app
+      redirect_uris: |
+        http://localhost:3000/callback
+        http://localhost:3000
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
+      sub_mode: hashed_user_id
+      include_claims_in_id_token: true
+      access_token_validity: hours=1
+
+  # ===================
+  # APPLICATION
+  # ===================
+  
+  - model: authentik_core.application
+    id: newsfeed-app
+    identifiers:
+      slug: newsfeed-app
+    attrs:
+      name: NewsFeed
+      slug: newsfeed-app
+      provider: !KeyOf newsfeed-provider
+      meta_launch_url: http://localhost:3000
+      meta_description: News Feed Application - View articles based on your keyword preferences
+      policy_engine_mode: any
+

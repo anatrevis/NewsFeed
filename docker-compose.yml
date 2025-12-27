@@ -60,6 +60,7 @@ services:
     volumes:
       - authentik_media:/media
       - authentik_templates:/templates
+      - ./authentik/blueprints:/blueprints/custom
     ports:
       - "9000:9000"
       - "9443:9443"
@@ -87,6 +88,7 @@ services:
     volumes:
       - authentik_media:/media
       - authentik_templates:/templates
+      - ./authentik/blueprints:/blueprints/custom
     depends_on:
       postgres:
         condition: service_healthy

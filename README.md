@@ -59,66 +59,50 @@ A full-stack news aggregator where authenticated users save keyword preferences 
 - Docker and Docker Compose
 - News API key (get one free at https://newsapi.org/register)
 
-### Setup
+### Setup (3 steps!)
 
-1. **Clone the repository**
+1. **Clone and configure**
    ```bash
-   git clone <repository-url>
-   cd newsfeed
-   ```
-
-2. **Create environment file**
-   ```bash
+   git clone https://github.com/anatrevis/NewsFeed.git
+   cd NewsFeed
    cp .env.example .env
    ```
 
-3. **Add your News API key to `.env`**
+2. **Add your News API key** - Edit `.env` and replace:
    ```
-   NEWS_API_KEY=your-newsapi-key-here
+   NEWS_API_KEY=your-actual-newsapi-key-here
    ```
+   > All other values are pre-configured and ready to use!
 
-4. **Start all services**
+3. **Start everything**
    ```bash
    docker-compose up -d
    ```
 
-5. **Wait for services to initialize** (first run takes ~2-3 minutes)
-   ```bash
-   docker-compose logs -f
-   ```
+That's it! Wait ~2-3 minutes for first-time initialization, then access:
+- **Frontend**: http://localhost:3000
+- **API Docs**: http://localhost:8000/docs  
+- **Authentik Admin**: http://localhost:9000
 
-6. **Access the applications**
-   - Frontend: http://localhost:3000
-   - API Docs: http://localhost:8000/docs
-   - Authentik Admin: http://localhost:9000
+### Authentication (Auto-Configured!)
 
-### Authentik Setup (Required)
-
-After first login to Authentik at http://localhost:9000:
+The OAuth2 application and provider are **automatically configured** via Authentik Blueprints on first startup. No manual setup required!
 
 **Default Admin Credentials**: `akadmin` / `admin123`
 
-1. **Create Application**
-   - Go to: Admin → Applications → Create
-   - Name: `NewsFeed`
-   - Slug: `newsfeed-app`
-   - Launch URL: `http://localhost:3000`
+**To create a test user:**
+1. Go to: http://localhost:9000
+2. Login with admin credentials above
+3. Go to: Admin → Directory → Users → Create
+4. Fill in username, email, and password
+5. This user can now log in to the NewsFeed app at http://localhost:3000
 
-2. **Create OAuth Provider**
-   - Go to: Admin → Providers → Create → OAuth2/OpenID Provider
-   - Name: `NewsFeed Provider`
-   - Client ID: `newsfeed-app`
-   - Client type: `Public`
-   - Redirect URIs: `http://localhost:3000/callback`
-   - Signing Key: Select any available key
-
-3. **Link Provider to Application**
-   - Edit the application and select the provider
-
-4. **Create a User** (for testing)
-   - Go to: Admin → Directory → Users → Create
-   - Fill in username, email, and password
-   - This user can now log in to the NewsFeed app
+**What's auto-configured:**
+- ✅ OAuth2 Provider (`NewsFeed Provider`)
+- ✅ Application (`NewsFeed` with slug `newsfeed-app`)
+- ✅ Client ID: `newsfeed-app` (public client)
+- ✅ Redirect URIs: `http://localhost:3000/callback`
+- ✅ OpenID scopes: `openid`, `email`, `profile`
 
 ## How Keyword Filtering Works
 
@@ -168,9 +152,14 @@ newsfeed/
 ├── .env.example               # Environment template
 ├── README.md
 │
+├── authentik/
+│   └── blueprints/            # Auto-configures OAuth2 on startup
+│       └── newsfeed-setup.yaml
+│
 ├── backend/
 │   ├── Dockerfile
 │   ├── requirements.txt
+│   ├── init.sql               # Database initialization
 │   └── app/
 │       ├── main.py            # FastAPI entry point
 │       ├── config.py          # Environment settings
