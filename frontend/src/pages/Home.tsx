@@ -133,8 +133,9 @@ export default function Home() {
   const totalPages = Math.ceil(totalResults / pageSize)
 
   return (
-    <div className="space-y-8">
-      {/* Keywords section */}
+    <>
+      <div className="space-y-8">
+        {/* Keywords section */}
       <KeywordManager
         keywords={keywords}
         onKeywordChange={handleKeywordChange}
@@ -417,12 +418,13 @@ export default function Home() {
         )}
       </div>
 
-      {/* AI Summary Modal */}
+      </div>
+
       <SummaryModal
         articles={articles}
         isOpen={showSummaryModal}
         onClose={() => setShowSummaryModal(false)}
       />
-    </div>
+    </>
   )
 }
