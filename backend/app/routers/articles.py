@@ -1,0 +1,56 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models.keyword import UserKeyword
+from app.schemas.article import ArticleList
+from app.services.auth_service import get_current_user
+from app.services.news_service import NewsService
+
+router = APIRouter()
+
+
+@router.get("", response_model=ArticleList)
+async def get_articles(
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Articles per page"),
+    sort_by: str = Query("publishedAt", description="Sort by: relevancy, popularity, publishedAt"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Get articles based on the current user's saved keywords.
+    
+    Returns articles from News API matching any of the user's keywords.
+    If the user has no keywords, returns an empty list.
+    """
+    user_id = current_user.get("sub")
+    
+    # Get user's keywords
+    user_keywords = (
+        db.query(UserKeyword)
+        .filter(UserKeyword.user_id == user_id)
+        .all()
+    )
+    
+    keywords = [kw.keyword for kw in user_keywords]
+    
+    if not keywords:
+        return ArticleList(articles=[], totalResults=0)
+    
+    # Fetch articles from News API
+    news_service = NewsService()
+    
+    try:
+        articles = await news_service.fetch_articles(
+            keywords=keywords,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+        )
+        return articles
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch articles: {str(e)}")
+
