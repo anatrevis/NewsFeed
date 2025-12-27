@@ -376,7 +376,7 @@ class TestSignupWithMockedAuthentik:
     @pytest.mark.asyncio
     async def test_signup_success(self, client):
         """Successful signup should return 201."""
-        with patch("app.routers.auth.httpx.AsyncClient") as mock_client:
+        with patch("app.services.authentik_service.httpx.AsyncClient") as mock_client:
             # Mock the flow initialization
             mock_init_response = MagicMock()
             mock_init_response.status_code = 200
@@ -417,7 +417,7 @@ class TestSignupWithMockedAuthentik:
     @pytest.mark.asyncio
     async def test_signup_duplicate_email(self, client):
         """Signup with duplicate email should return 409."""
-        with patch("app.routers.auth.httpx.AsyncClient") as mock_client:
+        with patch("app.services.authentik_service.httpx.AsyncClient") as mock_client:
             mock_init_response = MagicMock()
             mock_init_response.status_code = 200
             mock_init_response.json.return_value = {
@@ -458,7 +458,7 @@ class TestLoginWithMockedAuthentik:
     @pytest.mark.asyncio
     async def test_login_success(self, client):
         """Successful login should return token and user info."""
-        with patch("app.routers.auth.httpx.AsyncClient") as mock_client:
+        with patch("app.services.authentik_service.httpx.AsyncClient") as mock_client:
             # Mock flow initialization
             mock_init_response = MagicMock()
             mock_init_response.status_code = 200
@@ -508,7 +508,7 @@ class TestLoginWithMockedAuthentik:
     @pytest.mark.asyncio
     async def test_login_invalid_credentials(self, client):
         """Login with invalid credentials should return 401."""
-        with patch("app.routers.auth.httpx.AsyncClient") as mock_client:
+        with patch("app.services.authentik_service.httpx.AsyncClient") as mock_client:
             mock_init_response = MagicMock()
             mock_init_response.status_code = 200
             mock_init_response.json.return_value = {

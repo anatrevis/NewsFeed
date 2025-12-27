@@ -39,7 +39,7 @@ describe('App', () => {
 
     // Should show login page elements
     expect(screen.getByText('NewsFeed')).toBeInTheDocument()
-    expect(screen.getByText(/Sign in with Authentik/i)).toBeInTheDocument()
+    expect(screen.getByText(/Sign in to your account/i)).toBeInTheDocument()
   })
 
   it('shows loading state initially', () => {

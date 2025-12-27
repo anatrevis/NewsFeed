@@ -1,10 +1,8 @@
-import httpx
-import jwt
-from datetime import datetime, timedelta
-from fastapi import APIRouter, HTTPException, status, Depends
+"""Router for authentication endpoints."""
+
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from app.config import get_settings
 from app.schemas.auth import (
     LoginRequest,
     SignupRequest,
@@ -12,346 +10,89 @@ from app.schemas.auth import (
     SignupResponse,
     UserInfo,
 )
+from app.services.authentik_service import (
+    AuthentikService,
+    AuthentikServiceError,
+)
 from app.logging_config import get_logger
 
 router = APIRouter()
-settings = get_settings()
 security = HTTPBearer(auto_error=False)
 logger = get_logger(__name__)
 
-
-def create_app_token(user_data: dict) -> str:
-    """Create a JWT token for our application."""
-    token_payload = {
-        "sub": str(user_data.get("pk", user_data.get("sub", ""))),
-        "email": user_data.get("email", ""),
-        "name": user_data.get("name", ""),
-        "preferred_username": user_data.get("username", user_data.get("preferred_username", "")),
-        "exp": datetime.utcnow() + timedelta(hours=24),
-        "iat": datetime.utcnow(),
-    }
-    return jwt.encode(token_payload, settings.authentik_client_id, algorithm="HS256")
+# Service instance
+authentik_service = AuthentikService()
 
 
 @router.post("/login", response_model=AuthResponse)
 async def login(request: LoginRequest):
     """
-    Authenticate user with username and password using Authentik's flow executor.
+    Authenticate user with username and password.
     Returns access token and user info on success.
     """
     logger.info(f"Login attempt | username={request.username}")
-    
+
     try:
-        # Use cookies to maintain session across requests
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, cookies=httpx.Cookies()) as client:
-            # Step 1: Initialize the authentication flow
-            logger.debug(f"Initializing auth flow for user {request.username}")
-            flow_init = await client.get(
-                f"{settings.authentik_url}/api/v3/flows/executor/default-authentication-flow/",
-                params={"query": ""},
-            )
-            
-            if flow_init.status_code != 200:
-                logger.error(f"Auth service unavailable | status={flow_init.status_code}")
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Authentication service unavailable",
-                )
-            
-            flow_data = flow_init.json()
-            component = flow_data.get("component", "ak-stage-identification")
-            logger.debug(f"Auth flow component: {component}")
-            
-            # Step 2: Submit credentials based on the flow stage
-            if component == "ak-stage-identification":
-                # Combined identification and password
-                submit_response = await client.post(
-                    f"{settings.authentik_url}/api/v3/flows/executor/default-authentication-flow/",
-                    json={
-                        "component": "ak-stage-identification",
-                        "uid_field": request.username,
-                        "password": request.password,
-                    },
-                    params={"query": ""},
-                )
-                response_data = submit_response.json()
-                
-                # If identification stage passes to password stage
-                if response_data.get("component") == "ak-stage-password":
-                    logger.debug("Proceeding to password stage")
-                    submit_response = await client.post(
-                        f"{settings.authentik_url}/api/v3/flows/executor/default-authentication-flow/",
-                        json={
-                            "component": "ak-stage-password",
-                            "password": request.password,
-                        },
-                        params={"query": ""},
-                    )
-                    response_data = submit_response.json()
-            else:
-                response_data = flow_data
-            
-            # Check for errors
-            if response_data.get("component") == "ak-stage-access-denied":
-                logger.warning(f"Login failed - access denied | username={request.username}")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid username or password",
-                )
-            
-            if "response_errors" in response_data:
-                errors = response_data.get("response_errors", {})
-                logger.warning(f"Login failed - errors | username={request.username} | errors={errors}")
-                if "non_field_errors" in errors:
-                    error_list = errors["non_field_errors"]
-                    if error_list:
-                        raise HTTPException(
-                            status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail=error_list[0].get("string", "Authentication failed"),
-                        )
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid username or password",
-                )
-            
-            # Check if we need MFA or other stages
-            if response_data.get("component") in ["ak-stage-authenticator-validate", "ak-stage-authenticator-totp"]:
-                logger.warning(f"MFA required but not supported | username={request.username}")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Multi-factor authentication is required but not supported in this flow",
-                )
-            
-            # Check for successful redirect (login complete)
-            if response_data.get("type") == "redirect" or response_data.get("component") == "xak-flow-redirect":
-                # Get user info from the authenticated session
-                me_response = await client.get(
-                    f"{settings.authentik_url}/api/v3/core/users/me/",
-                )
-                
-                if me_response.status_code == 200:
-                    user_data = me_response.json().get("user", {})
-                    access_token = create_app_token(user_data)
-                    
-                    logger.info(f"Login successful | username={request.username} | user_id={user_data.get('pk')}")
-                    
-                    return AuthResponse(
-                        access_token=access_token,
-                        user=UserInfo(
-                            sub=str(user_data.get("pk", "")),
-                            email=user_data.get("email"),
-                            name=user_data.get("name"),
-                            preferred_username=user_data.get("username"),
-                        ),
-                    )
-            
-            logger.warning(f"Login failed - unexpected response | username={request.username}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password",
-            )
-            
-    except httpx.TimeoutException:
-        logger.error(f"Auth service timeout | username={request.username}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service is temporarily unavailable",
+        result = await authentik_service.login(
+            username=request.username,
+            password=request.password,
         )
-    except httpx.RequestError as e:
-        logger.error(f"Auth service connection error | username={request.username} | error={str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Unable to connect to authentication service",
+
+        return AuthResponse(
+            access_token=result.access_token,
+            user=UserInfo(
+                sub=result.user.id,
+                email=result.user.email,
+                name=result.user.name,
+                preferred_username=result.user.username,
+            ),
         )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected login error | username={request.username} | error={str(e)}", exc_info=True)
+
+    except AuthentikServiceError as e:
+        logger.warning(f"Login failed | username={request.username} | error={e.message}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred during login",
+            status_code=e.status_code,
+            detail=e.message,
         )
 
 
-@router.post("/signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/signup", response_model=SignupResponse, status_code=201)
 async def signup(request: SignupRequest):
     """
-    Create a new user account using Authentik's enrollment flow.
+    Create a new user account.
     """
     logger.info(f"Signup attempt | username={request.username} | email={request.email}")
-    
+
     try:
-        # Use cookies to maintain session across requests
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, cookies=httpx.Cookies()) as client:
-            # Step 1: Initialize the enrollment flow
-            logger.debug(f"Initializing enrollment flow for {request.username}")
-            flow_init = await client.get(
-                f"{settings.authentik_url}/api/v3/flows/executor/newsfeed-enrollment/",
-                params={"query": ""},
-            )
-            
-            if flow_init.status_code == 404:
-                logger.error("Enrollment flow not found (404)")
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="User registration is not configured",
-                )
-            
-            if flow_init.status_code != 200:
-                logger.error(f"Enrollment service unavailable | status={flow_init.status_code}")
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Registration service unavailable",
-                )
-            
-            flow_data = flow_init.json()
-            logger.debug(f"Enrollment flow component: {flow_data.get('component')}")
-            
-            # Check if access is denied immediately
-            if flow_data.get("component") == "ak-stage-access-denied":
-                logger.warning("Registration disabled")
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Registration is currently disabled",
-                )
-            
-            # Step 2: Submit user registration data
-            register_response = await client.post(
-                f"{settings.authentik_url}/api/v3/flows/executor/newsfeed-enrollment/",
-                json={
-                    "component": flow_data.get("component", "ak-stage-prompt"),
-                    "username": request.username,
-                    "email": request.email,
-                    "password": request.password,
-                    "password_repeat": request.password,
-                },
-                params={"query": ""},
-            )
-            
-            response_data = register_response.json()
-            
-            # Check for validation errors
-            if "response_errors" in response_data:
-                errors = response_data.get("response_errors", {})
-                logger.warning(f"Signup validation errors | username={request.username} | errors={errors}")
-                
-                # Check for specific field errors
-                if "username" in errors:
-                    error_list = errors["username"]
-                    if error_list:
-                        raise HTTPException(
-                            status_code=status.HTTP_409_CONFLICT,
-                            detail=error_list[0].get("string", "Username is already taken"),
-                        )
-                
-                if "email" in errors:
-                    error_list = errors["email"]
-                    if error_list:
-                        raise HTTPException(
-                            status_code=status.HTTP_409_CONFLICT,
-                            detail=error_list[0].get("string", "Email is already registered"),
-                        )
-                
-                if "password" in errors:
-                    error_list = errors["password"]
-                    if error_list:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=error_list[0].get("string", "Password does not meet requirements"),
-                        )
-                
-                if "non_field_errors" in errors:
-                    error_list = errors["non_field_errors"]
-                    if error_list:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=error_list[0].get("string", "Registration failed"),
-                        )
-                
-                # Generic error
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid registration data",
-                )
-            
-            # Check for access denied (can also indicate duplicate user)
-            if response_data.get("component") == "ak-stage-access-denied":
-                error_msg = response_data.get("error_message", "")
-                logger.warning(f"Signup access denied | username={request.username} | error={error_msg}")
-                if "update user" in error_msg.lower() or "already" in error_msg.lower():
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="Username or email is already taken",
-                    )
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=error_msg or "Registration is currently disabled",
-                )
-            
-            # Success - flow completed (redirect)
-            if response_data.get("type") == "redirect" or response_data.get("component") == "xak-flow-redirect":
-                logger.info(f"Signup successful | username={request.username} | email={request.email}")
-                return SignupResponse(
-                    message="Account created successfully. You can now log in.",
-                    username=request.username,
-                )
-            
-            # If we're still in another stage, something unexpected happened
-            logger.error(f"Signup incomplete | username={request.username} | response={response_data}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Registration process incomplete",
-            )
-            
-    except httpx.TimeoutException:
-        logger.error(f"Registration service timeout | username={request.username}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Registration service is temporarily unavailable",
+        message = await authentik_service.signup(
+            username=request.username,
+            email=request.email,
+            password=request.password,
         )
-    except httpx.RequestError as e:
-        logger.error(f"Registration service connection error | username={request.username} | error={str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Unable to connect to registration service",
+
+        return SignupResponse(
+            message=message,
+            username=request.username,
         )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected signup error | username={request.username} | error={str(e)}", exc_info=True)
+
+    except AuthentikServiceError as e:
+        logger.warning(f"Signup failed | username={request.username} | error={e.message}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred during registration",
+            status_code=e.status_code,
+            detail=e.message,
         )
 
 
-@router.post("/logout", status_code=status.HTTP_200_OK)
+@router.post("/logout", status_code=200)
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     Logout user and invalidate the session.
     """
-    if not credentials:
-        logger.debug("Logout without credentials")
-        return {"message": "Logged out successfully"}
+    token = credentials.credentials if credentials else None
     
-    token = credentials.credentials
     logger.info("User logout initiated")
     
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            # Try to revoke the token
-            await client.post(
-                f"{settings.authentik_url}/application/o/revoke/",
-                data={
-                    "token": token,
-                    "client_id": settings.authentik_client_id,
-                },
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
-            logger.debug("Token revocation sent")
-    except Exception as e:
-        logger.debug(f"Token revocation failed (non-critical): {str(e)}")
-        pass  # Ignore revocation errors
+    await authentik_service.logout(token)
     
     logger.info("User logged out successfully")
     return {"message": "Logged out successfully"}
