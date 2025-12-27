@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
 from app.models.keyword import UserKeyword
-from app.schemas.keyword import KeywordCreate, KeywordResponse, KeywordList
+from app.schemas.keyword import KeywordCreate, KeywordResponse, KeywordList, DeleteResponse
 from app.services.auth_service import get_current_user
 
 router = APIRouter()
@@ -62,7 +62,7 @@ async def create_keyword(
     return keyword
 
 
-@router.delete("/{keyword}")
+@router.delete("/{keyword}", response_model=DeleteResponse)
 async def delete_keyword(
     keyword: str,
     db: Session = Depends(get_db),
@@ -92,5 +92,5 @@ async def delete_keyword(
     db.delete(db_keyword)
     db.commit()
     
-    return {"message": f"Keyword '{keyword}' deleted successfully"}
+    return DeleteResponse(message=f"Keyword '{keyword}' deleted successfully")
 

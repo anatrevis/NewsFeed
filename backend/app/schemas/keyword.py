@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from uuid import UUID
 
@@ -14,12 +14,16 @@ class KeywordResponse(BaseModel):
     keyword: str
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class KeywordList(BaseModel):
     """Schema for list of keywords."""
     keywords: list[KeywordResponse]
     total: int
+
+
+class DeleteResponse(BaseModel):
+    """Schema for delete operation response."""
+    message: str
 

@@ -130,19 +130,62 @@ The OAuth2 application and provider are **automatically configured** via Authent
 
 ## Running Tests
 
-### Backend Tests
+### Via Docker (Recommended)
+
+If you have the Docker environment running, tests run inside the containers with all dependencies ready:
+
+**Backend (Pytest):**
 ```bash
-cd backend
-pip install -r requirements.txt
-pytest
+docker compose exec backend python -m pytest app/tests/ -v
 ```
 
-### Frontend Tests
+**Frontend (Vitest):**
+```bash
+docker compose exec frontend npm test -- --run
+```
+
+### Running Locally
+
+**Backend:**
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+pip install pytest pytest-asyncio pytest-mock
+pytest app/tests/ -v
+```
+
+**Frontend:**
 ```bash
 cd frontend
 npm install
-npm test
+npm test        # Watch mode
+npm test -- --run  # Single run
 ```
+
+### Test Coverage
+
+| Area | Framework | Tests | Coverage |
+|------|-----------|-------|----------|
+| **Backend** | Pytest | 37 | Keywords CRUD, Articles API, Auth, News Service |
+| **Frontend** | Vitest | 23 | App routing, Auth context, KeywordManager component |
+
+**Backend tests include:**
+- Keyword creation, retrieval, deletion
+- Input validation (empty keywords, duplicates, length limits)
+- User isolation (keywords are per-user)
+- Article fetching with pagination and sorting
+- Sort parameter enum validation (`relevancy`, `popularity`, `publishedAt`)
+- Authentication requirements on protected routes
+- News API service mocking (responses, errors, timeouts)
+
+**Frontend tests include:**
+- Authentication flow and redirects
+- Token persistence in localStorage
+- KeywordManager rendering and interactions
+- Add/delete keyword operations with loading states
+- Error handling and display
 
 ## Project Structure
 
