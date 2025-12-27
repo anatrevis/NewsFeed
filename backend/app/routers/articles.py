@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.keyword import UserKeyword
-from app.schemas.article import ArticleList, Language
+from app.schemas.article import ArticleList, SortBy, Language
 from app.services.auth_service import get_current_user
 from app.services.news_service import NewsService
 
@@ -14,7 +14,7 @@ router = APIRouter()
 async def get_articles(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Articles per page"),
-    sort_by: str = Query("publishedAt", description="Sort by: relevancy, popularity, publishedAt"),
+    sort_by: SortBy = Query(SortBy.published_at, description="Sort by: relevancy, popularity, publishedAt"),
     language: Language = Query(Language.en, description="Article language"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -47,7 +47,7 @@ async def get_articles(
             keywords=keywords,
             page=page,
             page_size=page_size,
-            sort_by=sort_by,
+            sort_by=sort_by.value,
             language=language.value,
         )
         return articles
@@ -55,4 +55,3 @@ async def get_articles(
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Failed to fetch articles: {str(e)}")
-

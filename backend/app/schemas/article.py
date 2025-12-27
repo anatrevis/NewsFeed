@@ -3,6 +3,13 @@ from pydantic import BaseModel
 from datetime import datetime
 
 
+class SortBy(str, Enum):
+    """Valid sort options for News API."""
+    relevancy = "relevancy"
+    popularity = "popularity"
+    published_at = "publishedAt"
+
+
 class Language(str, Enum):
     """Supported languages for News API."""
     en = "en"  # English
@@ -43,4 +50,3 @@ class ArticleList(BaseModel):
     articles: list[Article]
     totalResults: int
     status: str = "ok"
-
