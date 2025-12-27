@@ -12,6 +12,13 @@ A full-stack news aggregator where authenticated users save keyword preferences 
 - **Responsive UI**: Modern React interface with Tailwind CSS
 - **Structured Logging**: Configurable log levels with dev/production formats
 
+### Bonus Feature: AI-Powered Summarization
+
+- **AI Summary**: Generate intelligent summaries of your news feed using OpenAI
+- Click the "AI Summary" button to get a concise overview of all visible articles
+- Highlights key themes, events, and takeaways across multiple stories
+- Requires an OpenAI API key (optional - feature is disabled without it)
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -21,6 +28,7 @@ A full-stack news aggregator where authenticated users save keyword preferences 
 | Authentication | Authentik (OAuth2/OIDC) |
 | Database | PostgreSQL 15 |
 | External API | [News API](https://newsapi.org) |
+| AI Summarization | [OpenAI](https://openai.com) (optional) |
 | Infrastructure | Docker Compose |
 | Testing | Pytest, Vitest |
 
@@ -61,7 +69,7 @@ A full-stack news aggregator where authenticated users save keyword preferences 
 - Docker and Docker Compose
 - News API key (get one free at https://newsapi.org/register)
 
-### Setup (3 steps!)
+### Setup
 
 1. **Clone and configure**
    ```bash
@@ -70,21 +78,37 @@ A full-stack news aggregator where authenticated users save keyword preferences 
    cp .env.example .env
    ```
 
-2. **Add your News API key** - Edit `.env` and replace:
-   ```
+2. **Configure environment variables** - Edit `.env`:
+
+   **Required:**
+   ```bash
+   # Get your free API key at https://newsapi.org/register
    NEWS_API_KEY=your-actual-newsapi-key-here
    ```
-   > All other values are pre-configured and ready to use!
 
-3. **Start everything**
+   **Recommended (for security):**
    ```bash
-   docker-compose up -d
+   # Generate a random secret key:
+   # openssl rand -hex 32
+   # or: python -c "import secrets; print(secrets.token_hex(32))"
+   AUTHENTIK_SECRET_KEY=your-generated-secret-key
    ```
 
-That's it! Wait ~2-3 minutes for first-time initialization, then access:
-- **Frontend**: http://localhost:3000
-- **API Docs**: http://localhost:8000/docs  
-- **Authentik Admin**: http://localhost:9000
+   **Optional (for AI Summary feature):**
+   ```bash
+   # Get your API key at https://platform.openai.com/api-keys
+   OPENAI_API_KEY=your-openai-api-key
+   ```
+
+3. **Build and start everything**
+   ```bash
+   docker compose up -d --build
+   ```
+
+4. **Wait for initialization** (~2-3 minutes on first run), then access:
+   - **Frontend**: http://localhost:3000
+   - **API Docs**: http://localhost:8000/docs  
+   - **Authentik Admin**: http://localhost:9000
 
 ### Authentication
 
@@ -129,6 +153,13 @@ The application uses a **custom login/signup UI** with Authentik as the authenti
    - **Any Keyword (OR)**: Articles matching any of your keywords (broader results)
    - **All Keywords (AND)**: Articles containing all keywords (stricter, more relevant)
 
+6. **Sorting**: Articles can be sorted by:
+   - **Latest**: Most recent articles first (default)
+   - **Most Relevant**: Articles most relevant to your keywords
+
+7. **Language Filter**: Filter articles by 13 supported languages:
+   - English, Spanish, French, German, Italian, Portuguese, Dutch, Russian, Chinese, Arabic, Hebrew, Norwegian, Swedish
+
 ## Logging
 
 The backend features structured logging with different formats for development and production:
@@ -162,6 +193,8 @@ Use `DEBUG` for verbose output during development, `WARNING` or `ERROR` for prod
 | POST | `/api/keywords` | Add a keyword | Required |
 | DELETE | `/api/keywords/{keyword}` | Remove a keyword | Required |
 | GET | `/api/articles` | Get articles for user's keywords | Required |
+| GET | `/api/summarize/status` | Check if AI summarization is available | Public |
+| POST | `/api/summarize` | Generate AI summary of articles | Required |
 | GET | `/health` | Health check | Public |
 
 ## Running Tests
@@ -180,25 +213,6 @@ docker compose exec backend python -m pytest app/tests/ -v
 docker compose exec frontend npm test -- --run
 ```
 
-### Running Locally
-
-**Backend:**
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-pip install pytest pytest-asyncio pytest-mock
-pytest app/tests/ -v
-```
-
-**Frontend:**
-```bash
-cd frontend
-npm install
-npm test        # Watch mode
-npm test -- --run  # Single run
-```
 
 ### Test Coverage
 
@@ -270,6 +284,7 @@ newsfeed/
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `NEWS_API_KEY` | News API key for fetching articles | **Required** |
+| `OPENAI_API_KEY` | OpenAI API key for AI summarization (bonus feature) | *Optional* |
 | `ENVIRONMENT` | `development` or `production` | `development` |
 | `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` | `INFO` |
 | `POSTGRES_USER` | PostgreSQL username | `newsfeed` |
@@ -277,6 +292,8 @@ newsfeed/
 | `POSTGRES_DB` | PostgreSQL database name | `newsfeed` |
 | `AUTHENTIK_SECRET_KEY` | Authentik secret key | Auto-generated |
 | `AUTHENTIK_CLIENT_ID` | OAuth client ID | `newsfeed-app` |
+
+> **Note**: The AI Summary feature requires an OpenAI API key. Get one at https://platform.openai.com/api-keys
 
 ## News API Limitations
 
@@ -293,29 +310,8 @@ newsfeed/
 5. **Single User Session**: Designed for single browser session per user
 6. **Username Format**: Only lowercase letters and numbers allowed (no special characters)
 
-## Development
 
-### Running locally without Docker
 
-**Backend:**
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
 
-**Frontend:**
-```bash
-cd frontend
-npm install
-npm run dev
-```
 
-Note: You'll still need PostgreSQL and Authentik running for full functionality.
-
-## License
-
-MIT
 

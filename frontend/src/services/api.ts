@@ -179,3 +179,56 @@ export async function fetchArticles(
   return response.json()
 }
 
+// Summarize types
+export interface SummarizeStatus {
+  enabled: boolean
+  message: string | null
+}
+
+export interface ArticleForSummary {
+  title: string
+  description: string | null
+  source: string | null
+}
+
+export interface SummarizeResponse {
+  summary: string
+}
+
+// Summarize API
+export async function fetchSummarizeStatus(): Promise<SummarizeStatus> {
+  const response = await fetch(`${API_URL}/api/summarize/status`, {
+    headers: getAuthHeader(),
+  })
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch summarize status')
+  }
+  
+  return response.json()
+}
+
+export async function summarizeArticles(articles: Article[]): Promise<SummarizeResponse> {
+  const articlesForSummary: ArticleForSummary[] = articles.map((art) => ({
+    title: art.title,
+    description: art.description,
+    source: art.source?.name || null,
+  }))
+  
+  const response = await fetch(`${API_URL}/api/summarize`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader(),
+    },
+    body: JSON.stringify({ articles: articlesForSummary }),
+  })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Summarization failed' }))
+    throw new Error(error.detail || 'Failed to summarize articles')
+  }
+  
+  return response.json()
+}
+

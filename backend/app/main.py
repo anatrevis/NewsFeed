@@ -5,7 +5,7 @@ import time
 
 from app.config import get_settings
 from app.logging_config import setup_logging, get_logger
-from app.routers import keywords, articles, auth
+from app.routers import keywords, articles, auth, summarize
 
 settings = get_settings()
 
@@ -75,6 +75,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(keywords.router, prefix="/api/keywords", tags=["Keywords"])
 app.include_router(articles.router, prefix="/api/articles", tags=["Articles"])
+app.include_router(summarize.router, prefix="/api/summarize", tags=["Summarize"])
 
 
 @app.get("/health")
