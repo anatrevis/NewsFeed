@@ -156,13 +156,15 @@ export async function fetchArticles(
   page: number = 1,
   pageSize: number = 20,
   sortBy: string = 'publishedAt',
-  language: string = 'en'
+  language: string = 'en',
+  matchMode: string = 'any'
 ): Promise<ArticleList> {
   const params = new URLSearchParams({
     page: String(page),
     page_size: String(pageSize),
     sort_by: sortBy,
     language: language,
+    match_mode: matchMode,
   })
   
   const response = await fetch(`${API_URL}/api/articles?${params}`, {

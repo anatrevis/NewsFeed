@@ -24,7 +24,7 @@ async def test_fetch_articles_with_empty_keywords(news_service):
 
 @pytest.mark.asyncio
 async def test_fetch_articles_combines_keywords_with_or():
-    """Test that keywords are combined with OR operator."""
+    """Test that keywords are combined with OR operator by default."""
     with patch('app.services.news_service.settings') as mock_settings:
         mock_settings.news_api_key = "test-api-key"
         mock_settings.news_api_base_url = "https://newsapi.org/v2"
@@ -48,6 +48,94 @@ async def test_fetch_articles_combines_keywords_with_or():
             call_kwargs = mock_get.call_args
             params = call_kwargs.kwargs.get('params', {})
             assert "OR" in params.get("q", "")
+
+
+@pytest.mark.asyncio
+async def test_fetch_articles_match_mode_any_uses_or():
+    """Test that match_mode='any' combines keywords with OR."""
+    with patch('app.services.news_service.settings') as mock_settings:
+        mock_settings.news_api_key = "test-api-key"
+        mock_settings.news_api_base_url = "https://newsapi.org/v2"
+        
+        service = NewsService()
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "ok",
+            "totalResults": 0,
+            "articles": []
+        }
+        
+        with patch.object(httpx.AsyncClient, 'get', new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_response
+            
+            await service.fetch_articles(["tech", "ai"], match_mode="any")
+            
+            call_kwargs = mock_get.call_args
+            params = call_kwargs.kwargs.get('params', {})
+            query = params.get("q", "")
+            assert "OR" in query
+            assert "tech OR ai" == query
+
+
+@pytest.mark.asyncio
+async def test_fetch_articles_match_mode_all_uses_and():
+    """Test that match_mode='all' combines keywords with AND."""
+    with patch('app.services.news_service.settings') as mock_settings:
+        mock_settings.news_api_key = "test-api-key"
+        mock_settings.news_api_base_url = "https://newsapi.org/v2"
+        
+        service = NewsService()
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "ok",
+            "totalResults": 0,
+            "articles": []
+        }
+        
+        with patch.object(httpx.AsyncClient, 'get', new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_response
+            
+            await service.fetch_articles(["tech", "ai"], match_mode="all")
+            
+            call_kwargs = mock_get.call_args
+            params = call_kwargs.kwargs.get('params', {})
+            query = params.get("q", "")
+            assert "AND" in query
+            assert "tech AND ai" == query
+
+
+@pytest.mark.asyncio
+async def test_fetch_articles_default_match_mode_is_any():
+    """Test that default match mode is 'any' (OR)."""
+    with patch('app.services.news_service.settings') as mock_settings:
+        mock_settings.news_api_key = "test-api-key"
+        mock_settings.news_api_base_url = "https://newsapi.org/v2"
+        
+        service = NewsService()
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "ok",
+            "totalResults": 0,
+            "articles": []
+        }
+        
+        with patch.object(httpx.AsyncClient, 'get', new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_response
+            
+            # Call without specifying match_mode - should default to OR
+            await service.fetch_articles(["keyword1", "keyword2"])
+            
+            call_kwargs = mock_get.call_args
+            params = call_kwargs.kwargs.get('params', {})
+            query = params.get("q", "")
+            assert "OR" in query
+            assert "AND" not in query
 
 
 @pytest.mark.asyncio

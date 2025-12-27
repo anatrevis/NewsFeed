@@ -22,16 +22,18 @@ class NewsService:
         page_size: int = 20,
         sort_by: str = "publishedAt",
         language: str = "en",
+        match_mode: str = "any",
     ) -> ArticleList:
         """
         Fetch articles from News API based on keywords.
         
         Args:
-            keywords: List of keywords to search for (combined with OR)
+            keywords: List of keywords to search for
             page: Page number for pagination
             page_size: Number of articles per page (max 100)
             sort_by: Sort order (relevancy, popularity, publishedAt)
             language: Language code (en, es, fr, de, etc.)
+            match_mode: 'any' (OR - match any keyword) or 'all' (AND - match all keywords)
         
         Returns:
             ArticleList with articles and total count
@@ -42,8 +44,13 @@ class NewsService:
         if not self.api_key:
             raise ValueError("NEWS_API_KEY is not configured")
         
-        # Combine keywords with OR for broader search
-        query = " OR ".join(keywords)
+        # Build query based on match mode
+        if match_mode == "all":
+            # AND - articles must contain all keywords (stricter)
+            query = " AND ".join(keywords)
+        else:
+            # OR - articles can contain any keyword (broader, default)
+            query = " OR ".join(keywords)
         
         # Search articles from the last 30 days (News API free tier limitation)
         from_date = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
@@ -114,4 +121,3 @@ class NewsService:
         # For detail view, frontend can use the URL directly
         # This is a placeholder if we need to fetch more data
         return None
-

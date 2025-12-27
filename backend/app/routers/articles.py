@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.keyword import UserKeyword
-from app.schemas.article import ArticleList, SortBy, Language
+from app.schemas.article import ArticleList, SortBy, Language, MatchMode
 from app.services.auth_service import get_current_user
 from app.services.news_service import NewsService
 
@@ -16,13 +16,16 @@ async def get_articles(
     page_size: int = Query(20, ge=1, le=100, description="Articles per page"),
     sort_by: SortBy = Query(SortBy.published_at, description="Sort by: relevancy, popularity, publishedAt"),
     language: Language = Query(Language.en, description="Article language"),
+    match_mode: MatchMode = Query(MatchMode.any, description="Keyword matching: 'any' (OR) or 'all' (AND)"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     """
     Get articles based on the current user's saved keywords.
     
-    Returns articles from News API matching any of the user's keywords.
+    - match_mode='any': Returns articles matching ANY of the user's keywords (OR logic)
+    - match_mode='all': Returns articles matching ALL of the user's keywords (AND logic)
+    
     If the user has no keywords, returns an empty list.
     """
     user_id = current_user.get("sub")
@@ -49,6 +52,7 @@ async def get_articles(
             page_size=page_size,
             sort_by=sort_by.value,
             language=language.value,
+            match_mode=match_mode.value,
         )
         return articles
     except ValueError as e:

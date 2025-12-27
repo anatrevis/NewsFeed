@@ -27,6 +27,12 @@ class Language(str, Enum):
     sv = "sv"  # Swedish
 
 
+class MatchMode(str, Enum):
+    """Keyword matching mode for article search."""
+    any = "any"  # OR - match any keyword (broader results)
+    all = "all"  # AND - match all keywords (stricter results)
+
+
 class ArticleSource(BaseModel):
     """Schema for article source."""
     id: str | None = None

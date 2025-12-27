@@ -5,6 +5,7 @@ import { fetchKeywords, fetchArticles, Keyword, Article } from '../services/api'
 
 type SortOption = 'publishedAt' | 'relevancy'
 type LanguageOption = 'en' | 'es' | 'fr' | 'de' | 'it' | 'pt' | 'nl' | 'ru' | 'zh' | 'ar' | 'he' | 'no' | 'sv'
+type MatchModeOption = 'any' | 'all'
 
 const sortOptions: { value: SortOption; label: string; icon: string }[] = [
   { value: 'publishedAt', label: 'Latest', icon: '🕐' },
@@ -27,6 +28,11 @@ const languageOptions: { value: LanguageOption; label: string; flag: string }[] 
   { value: 'sv', label: 'Svenska', flag: '🇸🇪' },
 ]
 
+const matchModeOptions: { value: MatchModeOption; label: string; description: string }[] = [
+  { value: 'any', label: 'Any keyword', description: 'Shows articles matching at least one keyword' },
+  { value: 'all', label: 'All keywords', description: 'Shows only articles matching all keywords' },
+]
+
 export default function Home() {
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [articles, setArticles] = useState<Article[]>([])
@@ -37,6 +43,8 @@ export default function Home() {
   const [totalResults, setTotalResults] = useState(0)
   const [sortBy, setSortBy] = useState<SortOption>('publishedAt')
   const [language, setLanguage] = useState<LanguageOption>('en')
+  const [matchMode, setMatchMode] = useState<MatchModeOption>('any')
+  const [showMatchModeTooltip, setShowMatchModeTooltip] = useState(false)
   const pageSize = 12
 
   const loadKeywords = useCallback(async () => {
@@ -62,7 +70,7 @@ export default function Home() {
     setArticlesError(null)
 
     try {
-      const data = await fetchArticles(page, pageSize, sortBy, language)
+      const data = await fetchArticles(page, pageSize, sortBy, language, matchMode)
       setArticles(data.articles)
       setTotalResults(data.totalResults)
     } catch (err) {
@@ -71,7 +79,7 @@ export default function Home() {
     } finally {
       setArticlesLoading(false)
     }
-  }, [keywords.length, page, sortBy, language])
+  }, [keywords.length, page, sortBy, language, matchMode])
 
   // Load keywords on mount
   useEffect(() => {
@@ -100,6 +108,11 @@ export default function Home() {
     setPage(1)
   }
 
+  const handleMatchModeChange = (newMatchMode: MatchModeOption) => {
+    setMatchMode(newMatchMode)
+    setPage(1)
+  }
+
   const totalPages = Math.ceil(totalResults / pageSize)
 
   return (
@@ -113,7 +126,7 @@ export default function Home() {
 
       {/* Articles section */}
       <div>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-white">Your News Feed</h2>
             <p className="text-slate-400 mt-1">
@@ -123,9 +136,67 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Sort and Refresh controls */}
+          {/* Controls */}
           {keywords.length > 0 && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Match Mode Toggle */}
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex rounded-xl border border-midnight-600 p-1 bg-midnight-800">
+                    {matchModeOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => handleMatchModeChange(option.value)}
+                        disabled={articlesLoading}
+                        className={`px-3 py-1.5 text-sm rounded-lg transition-all disabled:opacity-50 ${
+                          matchMode === option.value
+                            ? 'bg-accent-cyan text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-300'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Info icon with tooltip */}
+                  <div 
+                    className="relative"
+                    onMouseEnter={() => setShowMatchModeTooltip(true)}
+                    onMouseLeave={() => setShowMatchModeTooltip(false)}
+                  >
+                    <svg
+                      className="w-4 h-4 text-slate-500 hover:text-slate-400 cursor-help transition-colors"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    {/* Tooltip */}
+                    {showMatchModeTooltip && (
+                      <div className="absolute z-50 bottom-full right-0 mb-2 w-64 p-3 bg-midnight-800 border border-midnight-600 rounded-xl shadow-xl">
+                        <div className="space-y-2 text-sm">
+                          <div>
+                            <span className="font-medium text-accent-cyan">Any keyword:</span>
+                            <p className="text-slate-400">More results - articles match at least one of your keywords</p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-accent-pink">All keywords:</span>
+                            <p className="text-slate-400">Fewer, specific results - articles must match all keywords</p>
+                          </div>
+                        </div>
+                        <div className="absolute bottom-0 right-4 translate-y-1/2 rotate-45 w-2 h-2 bg-midnight-800 border-r border-b border-midnight-600"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Sort dropdown */}
               <div className="relative">
                 <select
@@ -252,7 +323,9 @@ export default function Home() {
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">No articles found</h3>
             <p className="text-slate-400 max-w-md mx-auto">
-              Try different keywords to find more articles.
+              {matchMode === 'all' 
+                ? 'Try switching to "Any keyword" for more results, or adjust your keywords.'
+                : 'Try different keywords to find more articles.'}
             </p>
           </div>
         )}
@@ -294,4 +367,3 @@ export default function Home() {
     </div>
   )
 }
-
