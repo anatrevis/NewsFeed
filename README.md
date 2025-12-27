@@ -39,28 +39,33 @@ A full-stack news aggregator where authenticated users save keyword preferences 
 │                     Docker Compose Network                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ┌──────────────────┐              ┌──────────────────┐         │
-│  │    Frontend      │              │    Authentik     │         │
-│  │  React + TS      │◄────────────►│   OAuth2/OIDC    │         │
-│  │  :3000           │              │   :9000          │         │
-│  └────────┬─────────┘              └──────────────────┘         │
-│           │                                 ▲                    │
-│           ▼                                 │                    │
-│  ┌──────────────────────────────────────────┴───────────┐       │
-│  │                   FastAPI Backend                     │       │
-│  │                       :8000                           │       │
-│  └───────────────┬─────────────────────┬────────────────┘       │
-│                  │                     │                         │
-│                  ▼                     ▼                         │
-│  ┌──────────────────────┐     ┌──────────────────────┐          │
-│  │      PostgreSQL      │     │      News API        │          │
-│  │      :5432           │     │   (External)         │          │
-│  │  • newsfeed db       │     │                      │          │
-│  │  • authentik db      │     │                      │          │
-│  └──────────────────────┘     └──────────────────────┘          │
+│  ┌──────────────────┐                                           │
+│  │    Frontend      │                                           │
+│  │  React + TS      │                                           │
+│  │  :3000           │                                           │
+│  └────────┬─────────┘                                           │
+│           │                                                      │
+│           ▼                                                      │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │                   FastAPI Backend                         │   │
+│  │                       :8000                               │   │
+│  └─────┬─────────────┬─────────────┬─────────────┬──────────┘   │
+│        │             │             │             │               │
+│        ▼             ▼             ▼             ▼               │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐         │
+│  │PostgreSQL│  │ Authentik│  │ News API │  │  OpenAI  │         │
+│  │  :5432   │  │  :9000   │  │(External)│  │(External)│         │
+│  │• newsfeed│  │OAuth2/JWT│  │          │  │ Optional │         │
+│  │• authentik│ │          │  │          │  │          │         │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘         │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+> **Note:** The frontend communicates exclusively with the FastAPI backend. 
+> Authentication is handled via custom login/signup forms that proxy requests 
+> to Authentik through the backend, keeping all external service communication 
+> server-side.
 
 ## Quick Start
 
@@ -300,6 +305,28 @@ newsfeed/
 - **Free Tier**: 100 requests/day
 - **Historical Data**: Last 30 days only on free tier
 - **Results**: Maximum 100 articles per request
+
+## Why HTTP (Not HTTPS)
+
+This project uses HTTP for local development. This is intentional:
+
+| HTTPS Requirement | Added Complexity |
+|-------------------|------------------|
+| SSL Certificates | Requires mkcert/openssl installation |
+| Self-signed certs | Browser warnings, manual trust required |
+| Let's Encrypt | Requires a real domain name |
+| Config changes | All URLs need updating (CORS, OAuth, etc.) |
+
+**HTTP is standard for:**
+- ✅ Local development environments
+- ✅ Portfolio/demo projects
+- ✅ Simple `docker compose up` workflow
+- ✅ No additional tools required
+
+**For production deployment**, you would add:
+- A reverse proxy (Traefik/Caddy) with automatic Let's Encrypt
+- A real domain name
+- Updated OAuth redirect URIs
 
 ## Assumptions & Limitations
 
