@@ -215,16 +215,17 @@ docker compose exec backend python -m pytest app/tests/ -v
 
 **Frontend (Vitest):**
 ```bash
-docker compose exec frontend npm test -- --run
+# Run locally (production container uses nginx, no npm)
+cd frontend && npm test -- --run
 ```
-
 
 ### Test Coverage
 
 | Area | Framework | Tests | Coverage |
 |------|-----------|-------|----------|
 | **Backend** | Pytest | 69 | Keywords, Articles, Auth, News Service |
-| **Frontend** | Vitest | 19 | App routing, Auth context, KeywordManager |
+| **Frontend** | Vitest | 23 | App routing, Auth context, KeywordManager |
+| **Total** | | **92** | |
 
 **Backend tests include:**
 - Keyword creation, retrieval, deletion
@@ -267,9 +268,13 @@ newsfeed/
 │       ├── database.py        # PostgreSQL connection
 │       ├── logging_config.py  # Structured logging setup
 │       ├── models/            # SQLAlchemy models
-│       ├── schemas/           # Pydantic models
-│       ├── routers/           # API endpoints
-│       ├── services/          # Business logic
+│       ├── schemas/           # Pydantic schemas
+│       ├── routers/           # API endpoints (thin controllers)
+│       ├── services/          # Business logic & external APIs
+│       │   ├── auth_service.py       # Token validation
+│       │   ├── authentik_service.py  # Authentik login/signup
+│       │   ├── news_service.py       # News API client
+│       │   └── openai_service.py     # OpenAI summarization
 │       └── tests/             # Pytest tests
 │
 └── frontend/
