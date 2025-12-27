@@ -3,11 +3,28 @@ import KeywordManager from '../components/KeywordManager'
 import ArticleCard from '../components/ArticleCard'
 import { fetchKeywords, fetchArticles, Keyword, Article } from '../services/api'
 
-type SortOption = 'publishedAt' | 'relevancy' | 'popularity'
+type SortOption = 'publishedAt' | 'relevancy'
+type LanguageOption = 'en' | 'es' | 'fr' | 'de' | 'it' | 'pt' | 'nl' | 'ru' | 'zh' | 'ar' | 'he' | 'no' | 'sv'
 
 const sortOptions: { value: SortOption; label: string; icon: string }[] = [
   { value: 'publishedAt', label: 'Latest', icon: '🕐' },
   { value: 'relevancy', label: 'Most Relevant', icon: '🎯' },
+]
+
+const languageOptions: { value: LanguageOption; label: string; flag: string }[] = [
+  { value: 'en', label: 'English', flag: '🇬🇧' },
+  { value: 'es', label: 'Español', flag: '🇪🇸' },
+  { value: 'fr', label: 'Français', flag: '🇫🇷' },
+  { value: 'de', label: 'Deutsch', flag: '🇩🇪' },
+  { value: 'it', label: 'Italiano', flag: '🇮🇹' },
+  { value: 'pt', label: 'Português', flag: '🇵🇹' },
+  { value: 'nl', label: 'Nederlands', flag: '🇳🇱' },
+  { value: 'ru', label: 'Русский', flag: '🇷🇺' },
+  { value: 'zh', label: '中文', flag: '🇨🇳' },
+  { value: 'ar', label: 'العربية', flag: '🇸🇦' },
+  { value: 'he', label: 'עברית', flag: '🇮🇱' },
+  { value: 'no', label: 'Norsk', flag: '🇳🇴' },
+  { value: 'sv', label: 'Svenska', flag: '🇸🇪' },
 ]
 
 export default function Home() {
@@ -19,6 +36,7 @@ export default function Home() {
   const [page, setPage] = useState(1)
   const [totalResults, setTotalResults] = useState(0)
   const [sortBy, setSortBy] = useState<SortOption>('publishedAt')
+  const [language, setLanguage] = useState<LanguageOption>('en')
   const pageSize = 12
 
   const loadKeywords = useCallback(async () => {
@@ -44,7 +62,7 @@ export default function Home() {
     setArticlesError(null)
 
     try {
-      const data = await fetchArticles(page, pageSize, sortBy)
+      const data = await fetchArticles(page, pageSize, sortBy, language)
       setArticles(data.articles)
       setTotalResults(data.totalResults)
     } catch (err) {
@@ -53,7 +71,7 @@ export default function Home() {
     } finally {
       setArticlesLoading(false)
     }
-  }, [keywords.length, page, sortBy])
+  }, [keywords.length, page, sortBy, language])
 
   // Load keywords on mount
   useEffect(() => {
@@ -74,6 +92,11 @@ export default function Home() {
 
   const handleSortChange = (newSort: SortOption) => {
     setSortBy(newSort)
+    setPage(1)
+  }
+
+  const handleLanguageChange = (newLanguage: LanguageOption) => {
+    setLanguage(newLanguage)
     setPage(1)
   }
 
@@ -114,6 +137,30 @@ export default function Home() {
                   {sortOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.icon} {option.label}
+                    </option>
+                  ))}
+                </select>
+                <svg
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+
+              {/* Language dropdown */}
+              <div className="relative">
+                <select
+                  value={language}
+                  onChange={(e) => handleLanguageChange(e.target.value as LanguageOption)}
+                  disabled={articlesLoading}
+                  className="appearance-none bg-midnight-800 hover:bg-midnight-700 border border-midnight-600 rounded-xl pl-4 pr-10 py-2 text-sm text-slate-300 transition-colors disabled:opacity-50 cursor-pointer focus:outline-none focus:border-accent-cyan"
+                >
+                  {languageOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.flag} {option.label}
                     </option>
                   ))}
                 </select>

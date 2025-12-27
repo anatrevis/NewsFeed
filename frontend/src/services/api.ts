@@ -86,12 +86,14 @@ export async function deleteKeyword(keyword: string): Promise<void> {
 export async function fetchArticles(
   page: number = 1,
   pageSize: number = 20,
-  sortBy: string = 'publishedAt'
+  sortBy: string = 'publishedAt',
+  language: string = 'en'
 ): Promise<ArticleList> {
   const params = new URLSearchParams({
     page: String(page),
     page_size: String(pageSize),
     sort_by: sortBy,
+    language: language,
   })
   
   const response = await fetch(`${API_URL}/api/articles?${params}`, {

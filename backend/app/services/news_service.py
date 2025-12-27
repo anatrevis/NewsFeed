@@ -21,6 +21,7 @@ class NewsService:
         page: int = 1,
         page_size: int = 20,
         sort_by: str = "publishedAt",
+        language: str = "en",
     ) -> ArticleList:
         """
         Fetch articles from News API based on keywords.
@@ -30,6 +31,7 @@ class NewsService:
             page: Page number for pagination
             page_size: Number of articles per page (max 100)
             sort_by: Sort order (relevancy, popularity, publishedAt)
+            language: Language code (en, es, fr, de, etc.)
         
         Returns:
             ArticleList with articles and total count
@@ -53,7 +55,7 @@ class NewsService:
             "page": page,
             "pageSize": min(page_size, 100),
             "apiKey": self.api_key,
-            "language": "en",
+            "language": language,
         }
         
         try:
@@ -70,22 +72,27 @@ class NewsService:
                 
                 data = response.json()
                 
-                articles = [
-                    Article(
+                # Filter out articles with missing required fields (title, url)
+                articles = []
+                for art in data.get("articles", []):
+                    title = art.get("title")
+                    url = art.get("url")
+                    # Skip articles without title or url
+                    if not title or not url:
+                        continue
+                    articles.append(Article(
                         source=ArticleSource(
                             id=art.get("source", {}).get("id"),
                             name=art.get("source", {}).get("name"),
                         ),
                         author=art.get("author"),
-                        title=art.get("title", ""),
+                        title=title,
                         description=art.get("description"),
-                        url=art.get("url", ""),
+                        url=url,
                         urlToImage=art.get("urlToImage"),
                         publishedAt=art.get("publishedAt"),
                         content=art.get("content"),
-                    )
-                    for art in data.get("articles", [])
-                ]
+                    ))
                 
                 return ArticleList(
                     articles=articles,

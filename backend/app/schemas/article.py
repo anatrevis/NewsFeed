@@ -1,5 +1,23 @@
+from enum import Enum
 from pydantic import BaseModel
 from datetime import datetime
+
+
+class Language(str, Enum):
+    """Supported languages for News API."""
+    en = "en"  # English
+    es = "es"  # Spanish
+    fr = "fr"  # French
+    de = "de"  # German
+    it = "it"  # Italian
+    pt = "pt"  # Portuguese
+    nl = "nl"  # Dutch
+    ru = "ru"  # Russian
+    zh = "zh"  # Chinese
+    ar = "ar"  # Arabic
+    he = "he"  # Hebrew
+    no = "no"  # Norwegian
+    sv = "sv"  # Swedish
 
 
 class ArticleSource(BaseModel):
