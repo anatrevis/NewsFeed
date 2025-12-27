@@ -1,5 +1,13 @@
+from enum import Enum
 from pydantic import BaseModel
 from datetime import datetime
+
+
+class SortBy(str, Enum):
+    """Valid sort options for News API."""
+    relevancy = "relevancy"
+    popularity = "popularity"
+    published_at = "publishedAt"
 
 
 class ArticleSource(BaseModel):
