@@ -36,11 +36,14 @@ export default function Article() {
   }
 
   const formattedDate = article.publishedAt
-    ? new Date(article.publishedAt).toLocaleDateString('en-US', {
+    ? new Date(article.publishedAt).toLocaleString('en-US', {
         weekday: 'long',
         month: 'long',
         day: 'numeric',
         year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
       })
     : null
 

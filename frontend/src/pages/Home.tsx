@@ -3,6 +3,13 @@ import KeywordManager from '../components/KeywordManager'
 import ArticleCard from '../components/ArticleCard'
 import { fetchKeywords, fetchArticles, Keyword, Article } from '../services/api'
 
+type SortOption = 'publishedAt' | 'relevancy' | 'popularity'
+
+const sortOptions: { value: SortOption; label: string; icon: string }[] = [
+  { value: 'publishedAt', label: 'Latest', icon: '🕐' },
+  { value: 'relevancy', label: 'Most Relevant', icon: '🎯' },
+]
+
 export default function Home() {
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [articles, setArticles] = useState<Article[]>([])
@@ -11,6 +18,7 @@ export default function Home() {
   const [articlesError, setArticlesError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalResults, setTotalResults] = useState(0)
+  const [sortBy, setSortBy] = useState<SortOption>('publishedAt')
   const pageSize = 12
 
   const loadKeywords = useCallback(async () => {
@@ -36,7 +44,7 @@ export default function Home() {
     setArticlesError(null)
 
     try {
-      const data = await fetchArticles(page, pageSize)
+      const data = await fetchArticles(page, pageSize, sortBy)
       setArticles(data.articles)
       setTotalResults(data.totalResults)
     } catch (err) {
@@ -45,7 +53,7 @@ export default function Home() {
     } finally {
       setArticlesLoading(false)
     }
-  }, [keywords.length, page])
+  }, [keywords.length, page, sortBy])
 
   // Load keywords on mount
   useEffect(() => {
@@ -61,6 +69,11 @@ export default function Home() {
 
   const handleKeywordChange = () => {
     loadKeywords()
+    setPage(1)
+  }
+
+  const handleSortChange = (newSort: SortOption) => {
+    setSortBy(newSort)
     setPage(1)
   }
 
@@ -87,28 +100,55 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Refresh button */}
+          {/* Sort and Refresh controls */}
           {keywords.length > 0 && (
-            <button
-              onClick={loadArticles}
-              disabled={articlesLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-midnight-800 hover:bg-midnight-700 border border-midnight-600 rounded-xl text-sm text-slate-300 transition-colors disabled:opacity-50"
-            >
-              <svg
-                className={`w-4 h-4 ${articlesLoading ? 'animate-spin' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+            <div className="flex items-center gap-3">
+              {/* Sort dropdown */}
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(e) => handleSortChange(e.target.value as SortOption)}
+                  disabled={articlesLoading}
+                  className="appearance-none bg-midnight-800 hover:bg-midnight-700 border border-midnight-600 rounded-xl pl-4 pr-10 py-2 text-sm text-slate-300 transition-colors disabled:opacity-50 cursor-pointer focus:outline-none focus:border-accent-cyan"
+                >
+                  {sortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.icon} {option.label}
+                    </option>
+                  ))}
+                </select>
+                <svg
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+
+              {/* Refresh button */}
+              <button
+                onClick={loadArticles}
+                disabled={articlesLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-midnight-800 hover:bg-midnight-700 border border-midnight-600 rounded-xl text-sm text-slate-300 transition-colors disabled:opacity-50"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              Refresh
-            </button>
+                <svg
+                  className={`w-4 h-4 ${articlesLoading ? 'animate-spin' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                Refresh
+              </button>
+            </div>
           )}
         </div>
 

@@ -1,9 +1,8 @@
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { Outlet, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Layout() {
   const { user, logout } = useAuth()
-  const location = useLocation()
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -20,20 +19,6 @@ export default function Layout() {
               </div>
               <span className="text-xl font-bold text-white">NewsFeed</span>
             </Link>
-
-            {/* Nav */}
-            <nav className="hidden md:flex items-center gap-6">
-              <Link
-                to="/"
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname === '/'
-                    ? 'text-accent-cyan'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Home
-              </Link>
-            </nav>
 
             {/* User menu */}
             <div className="flex items-center gap-4">

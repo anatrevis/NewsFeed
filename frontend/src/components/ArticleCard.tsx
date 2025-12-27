@@ -7,10 +7,13 @@ interface ArticleCardProps {
 
 export default function ArticleCard({ article }: ArticleCardProps) {
   const formattedDate = article.publishedAt
-    ? new Date(article.publishedAt).toLocaleDateString('en-US', {
+    ? new Date(article.publishedAt).toLocaleString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
       })
     : null
 
